@@ -1,0 +1,66 @@
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// Function to calculate QLAC payments
+NumericVector calculateQLACPayments(NumericVector inf_fac, NumericVector ddRates, NumericVector qlac_payments, NumericVector survival, double nonstochastic) {
+  int n = inf_fac.size();
+  NumericVector pmts(n);
+  NumericVector pmts1(n);
+  NumericVector shortfall_rate(ddRates.size());
+
+  for (int i = 0; i < ddRates.size(); ++i) {
+    pmts.fill(0);
+    pmts1.fill(0);
+    double temp_sf = 0;
+    double balance = Current_balance;
+
+    for (int j = 0; j < n; ++j) {
+      if (z <= horizon) {
+        pmts[Range(z, horizon)] = Current_balance * inf_fac[Range(z, horizon)] * ddRates[i];
+        pmts[Range(horizon + 1, current_gap)] = (Current_balance * inf_fac[Range(horizon + 1, current_gap)] * ddRates[i]) -
+          qlac_payments[Range(horizon + 1, current_gap)];
+      } else {
+        pmts[Range(z, current_gap)] = (Current_balance * inf_fac[Range(z, current_gap)] * ddRates[i]) -
+          qlac_payments[Range(z, current_gap)];
+      }
+
+      pmts[pmts < 0] = 0;
+      pmts1[Range(z, current_gap)] = pmts[Range(z, current_gap)] + qlac_payments[Range(z, current_gap)];
+      pmts1[pmts1 < 0] = 0;
+
+      pmts1[Range(z, current_gap)] = pmts1[Range(z, current_gap)] / inf_fac[Range(z, current_gap)];
+      balance = balance - pmts[Range(j)];
+      bool fail = balance <= 0;
+      double idx = pmts1[j] / real_pmts[s - 1];
+      if (z == 1) {
+        idx = 1;
+      }
+      if (idx > 1) {
+        idx = 1;
+      }
+      idx = idx * survival[j];
+      idx = as<double>(idx);
+      if (fail == 1) {
+        idx = 0;
+      }
+      if (z == 1) {
+        temp_sf = temp_sf + sum(fail) * survival[j];
+      } else {
+        temp_sf = temp_sf + idx;
+      }
+
+      balance = balance * nonstochastic;
+    }
+
+    double sum_surv_prb = sum(survival[Range(z, current_gap)]);
+    double IDR = temp_sf / sum_surv_prb;
+
+    if (z > 1) {
+      temp_sf = 1 - IDR;
+    }
+
+    shortfall_rate[i] = temp_sf;
+  }
+
+  return shortfall_rate;
+}
